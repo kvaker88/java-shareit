@@ -1,13 +1,13 @@
 package ru.practicum.shareit.item.dao;
 
-import org.springframework.stereotype.Repository;
+import org.springframework.stereotype.Component;
 import ru.practicum.shareit.exception.NotFoundException;
 import ru.practicum.shareit.item.model.Item;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 
-@Repository
+@Component
 public class ItemRepository {
     private final Map<Long, Item> items = new HashMap<>();
     private final AtomicLong idCounter = new AtomicLong(1);
@@ -43,9 +43,5 @@ public class ItemRepository {
 
     public void delete(Long itemId) {
         items.remove(itemId);
-    }
-
-    public boolean existsById(Long itemId) {
-        return items.containsKey(itemId);
     }
 }
