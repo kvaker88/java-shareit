@@ -5,7 +5,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import ru.practicum.shareit.item.dto.ItemDto;
+import ru.practicum.shareit.item.comment.dto.CommentRequestDto;
+import ru.practicum.shareit.item.comment.dto.CommentResponseDto;
+import ru.practicum.shareit.item.dto.ItemRequestDto;
+import ru.practicum.shareit.item.dto.ItemResponseDto;
 import ru.practicum.shareit.item.service.ItemService;
 
 import java.util.List;
@@ -20,52 +23,51 @@ public class ItemController {
     private final ItemService itemService;
 
     @PostMapping
-    public ResponseEntity<ItemDto> createItem(
+    public ResponseEntity<ItemResponseDto> createItem(
             @RequestHeader(SHARER_USER_ID) Long userId,
-            @Valid @RequestBody ItemDto itemDto
+            @Valid @RequestBody ItemRequestDto itemDto
     ) {
         log.info("Запрос на создание предмета пользователем {}: {}", userId, itemDto);
-        ItemDto item = itemService.createItem(userId, itemDto);
+        ItemResponseDto item = itemService.createItem(userId, itemDto);
         return ResponseEntity.ok(item);
     }
 
     @GetMapping("/{itemId}")
-    public ResponseEntity<ItemDto> getItemById(
-            @PathVariable Long itemId
-    ) {
+    public ResponseEntity<ItemResponseDto> getById(@PathVariable Long itemId,
+                @RequestHeader(SHARER_USER_ID) Long userId) {
         log.info("Запрос на получение предмета по ID {}", itemId);
-        ItemDto item = itemService.getItemById(itemId);
+        ItemResponseDto item = itemService.getItemById(itemId, userId);
         return ResponseEntity.ok(item);
     }
 
     @GetMapping
-    public ResponseEntity<List<ItemDto>> getAllUserItems(
+    public ResponseEntity<List<ItemResponseDto>> getAllUserItems(
             @RequestHeader(SHARER_USER_ID) Long userId
     ) {
         log.info("Запрос на получение всех предметов пользователя {}", userId);
-        List<ItemDto> items = itemService.getAllUserItems(userId);
+        List<ItemResponseDto> items = itemService.getAllUserItems(userId);
         return ResponseEntity.ok(items);
     }
 
     @GetMapping("/search")
-    public ResponseEntity<List<ItemDto>> searchItems(
+    public ResponseEntity<List<ItemResponseDto>> searchItems(
             @RequestParam String text,
             @RequestParam(defaultValue = "0") Integer from,
             @RequestParam(defaultValue = "10") Integer size
     ) {
         log.info("Запрос на поиск предметов по тексту - {}", text);
-        List<ItemDto> items = itemService.searchItems(text, from, size);
+        List<ItemResponseDto> items = itemService.searchItems(text, from, size);
         return ResponseEntity.ok(items);
     }
 
     @PatchMapping("/{itemId}")
-    public ResponseEntity<ItemDto> updateItem(
+    public ResponseEntity<ItemResponseDto> updateItem(
             @RequestHeader(SHARER_USER_ID) Long userId,
             @PathVariable Long itemId,
-            @RequestBody ItemDto itemDto
+            @RequestBody ItemRequestDto itemDto
     ) {
         log.info("Запрос обновления предмета пользователем {}: {}", userId, itemDto);
-        ItemDto item = itemService.updateItem(userId, itemId, itemDto);
+        ItemResponseDto item = itemService.updateItem(userId, itemId, itemDto);
         return ResponseEntity.ok(item);
     }
 
@@ -77,5 +79,14 @@ public class ItemController {
         log.info("Запрос удаления предмета пользователем {}: {}", userId, itemId);
         itemService.deleteItem(userId, itemId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{itemId}/comment")
+    public CommentResponseDto addComment(
+            @PathVariable Long itemId,
+            @RequestBody CommentRequestDto commentRequestDto,
+            @RequestHeader(SHARER_USER_ID) Long userId
+    ) {
+        return itemService.addComment(itemId, commentRequestDto, userId);
     }
 }
