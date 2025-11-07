@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.shareit.booking.dto.BookingRequestDto;
 import ru.practicum.shareit.booking.dto.BookingResponseDto;
+import ru.practicum.shareit.booking.model.BookingState;
 import ru.practicum.shareit.booking.service.BookingService;
 
 import java.util.List;
@@ -15,12 +16,12 @@ import java.util.List;
 public class BookingController {
 
     private final BookingService bookingService;
-    private static final String USER_ID_HEADER = "X-Sharer-User-Id";
+    private static final String SHARER_USER_ID = "X-Sharer-User-Id";
 
     @PostMapping
     public BookingResponseDto createBooking(
             @Valid @RequestBody BookingRequestDto bookingRequestDto,
-            @RequestHeader(USER_ID_HEADER) Long userId
+            @RequestHeader(SHARER_USER_ID) Long userId
     ) {
         return bookingService.createBooking(bookingRequestDto, userId);
     }
@@ -29,7 +30,7 @@ public class BookingController {
     public BookingResponseDto updateBooking(
             @PathVariable Long bookingId,
             @RequestParam Boolean approved,
-            @RequestHeader(USER_ID_HEADER) Long userId
+            @RequestHeader(SHARER_USER_ID) Long userId
     ) {
         return bookingService.updateBooking(bookingId, userId, approved);
     }
@@ -37,25 +38,34 @@ public class BookingController {
     @GetMapping("/{bookingId}")
     public BookingResponseDto getBookingById(
             @PathVariable Long bookingId,
-            @RequestHeader(USER_ID_HEADER) Long userId
+            @RequestHeader(SHARER_USER_ID) Long userId
     ) {
         return bookingService.getBookingById(bookingId, userId);
     }
 
     @GetMapping
     public List<BookingResponseDto> getBookingByBookerId(
-            @RequestHeader(USER_ID_HEADER) Long userId,
+            @RequestHeader(SHARER_USER_ID) Long userId,
             @RequestParam(defaultValue = "ALL") String state
     ) {
-        return bookingService.getBookingByBookerId(userId, state);
+        BookingState bookingState = parseBookingState(state);
+        return bookingService.getBookingByBookerId(userId, bookingState);
     }
 
     @GetMapping("/owner")
     public List<BookingResponseDto> getBookingByOwnerId(
-            @RequestHeader(USER_ID_HEADER) Long userId,
+            @RequestHeader(SHARER_USER_ID) Long userId,
             @RequestParam(defaultValue = "ALL") String state
     ) {
-        return bookingService.getBookingByOwnerId(userId, state);
+        BookingState bookingState = parseBookingState(state);
+        return bookingService.getBookingByOwnerId(userId, bookingState);
     }
 
+    private BookingState parseBookingState(String state) {
+        try {
+            return BookingState.valueOf(state.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Неизвестное состояние: " + state);
+        }
+    }
 }

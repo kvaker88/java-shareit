@@ -1,14 +1,17 @@
 package ru.practicum.shareit.booking.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.shareit.booking.dto.BookingRequestDto;
 import ru.practicum.shareit.booking.dto.BookingResponseDto;
 import ru.practicum.shareit.booking.mapper.BookingMapper;
 import ru.practicum.shareit.booking.model.Booking;
+import ru.practicum.shareit.booking.model.BookingState;
 import ru.practicum.shareit.booking.model.BookingStatus;
 import ru.practicum.shareit.booking.repository.BookingRepository;
+import ru.practicum.shareit.exception.AccessDeniedException;
 import ru.practicum.shareit.exception.NotFoundException;
 import ru.practicum.shareit.item.model.Item;
 import ru.practicum.shareit.item.repository.ItemRepository;
@@ -27,12 +30,15 @@ public class BookingServiceImpl implements BookingService {
     private static final String USER_NOT_FOUND = "Не удалось найти пользователя";
     private static final String ITEM_NOT_FOUND = "Не удалось найти предмет";
     private static final String ITEM_NOT_AVAILABLE = "Предмет недоступен";
-    private static final String UNKNOWN_STATE = "Неизвестный статус ";
 
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final ItemRepository itemRepository;
     private final BookingMapper bookingMapper;
+
+    private static final Sort NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "start");
+    private static final Sort OLDEST_FIRST = Sort.by(Sort.Direction.ASC, "start");
+    private static final Sort END_DESC = Sort.by(Sort.Direction.DESC, "end");
 
     @Override
     @Transactional
@@ -65,14 +71,17 @@ public class BookingServiceImpl implements BookingService {
         return bookingMapper.toBookingResponseDto(savedBooking);
     }
 
-    @Override
     @Transactional
-    public BookingResponseDto updateBooking(Long bookingId, Long ownerId, Boolean approved) {
+    public BookingResponseDto updateBooking(Long bookingId, Long ownerId, boolean approved) {
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new NoSuchElementException(BOOKING_NOT_FOUND));
+                .orElseThrow(() -> new NotFoundException(BOOKING_NOT_FOUND));
 
         if (!booking.getItem().getOwner().equals(ownerId)) {
-            throw new IllegalArgumentException("Только владелец может обновить статус бронирования");
+            throw new AccessDeniedException("Только владелец может обновить статус бронирования");
+        }
+
+        if (!userRepository.existsById(ownerId)) {
+            throw new NotFoundException(USER_NOT_FOUND);
         }
 
         if (booking.getStatus() != BookingStatus.WAITING) {
@@ -97,43 +106,40 @@ public class BookingServiceImpl implements BookingService {
         return bookingMapper.toBookingResponseDto(booking);
     }
 
-    @Override
-    public List<BookingResponseDto> getBookingByBookerId(Long bookerId, String state) {
-        userRepository.findById(bookerId).orElseThrow(() -> new NoSuchElementException(USER_NOT_FOUND));
+    public List<BookingResponseDto> getBookingByBookerId(Long bookerId, BookingState state) {
+        userRepository.findById(bookerId).orElseThrow(() -> new NotFoundException(USER_NOT_FOUND));
 
-        return switch (state.toUpperCase()) {
-            case "ALL" -> bookingRepository.findByBookerIdOrderByStartDesc(bookerId).stream()
+        return switch (state) {
+            case ALL -> bookingRepository.findByBookerId(bookerId, NEWEST_FIRST).stream()
                     .map(bookingMapper::toBookingResponseDto)
                     .toList();
-            case "CURRENT" -> {
+            case CURRENT -> {
                 LocalDateTime now = LocalDateTime.now();
-                yield bookingRepository.findCurrentBookingsByBooker(bookerId, now).stream()
+                yield bookingRepository.findCurrentBookingsByBooker(bookerId, now, NEWEST_FIRST).stream()
                         .map(bookingMapper::toBookingResponseDto)
                         .toList();
             }
-            case "PAST" -> bookingRepository.findByBookerIdAndEndBeforeOrderByStartDesc(
-                            bookerId, LocalDateTime.now()).stream()
+            case PAST -> bookingRepository.findByBookerIdAndEndBefore(
+                            bookerId, LocalDateTime.now(), NEWEST_FIRST).stream()
                     .map(bookingMapper::toBookingResponseDto)
                     .toList();
-            case "FUTURE" -> bookingRepository.findByBookerIdAndStartAfterOrderByStartDesc(
-                            bookerId, LocalDateTime.now()).stream()
+            case FUTURE -> bookingRepository.findByBookerIdAndStartAfter(
+                            bookerId, LocalDateTime.now(), NEWEST_FIRST).stream()
                     .map(bookingMapper::toBookingResponseDto)
                     .toList();
-            case "WAITING", "REJECTED" -> {
-                BookingStatus status = BookingStatus.valueOf(state.toUpperCase());
-                yield bookingRepository.findByBookerIdAndStatusOrderByStartDesc(bookerId, status).stream()
+            case WAITING, REJECTED -> {
+                BookingStatus status = BookingStatus.valueOf(state.name());
+                yield bookingRepository.findByBookerIdAndStatus(bookerId, status, NEWEST_FIRST).stream()
                         .map(bookingMapper::toBookingResponseDto)
                         .toList();
             }
-            default -> throw new IllegalArgumentException(UNKNOWN_STATE + state);
         };
     }
 
     @Override
-    public List<BookingResponseDto> getBookingByOwnerId(Long ownerId, String state) {
-        userRepository.findById(ownerId).orElseThrow(() -> new NoSuchElementException(USER_NOT_FOUND));
+    public List<BookingResponseDto> getBookingByOwnerId(Long ownerId, BookingState state) {
+        userRepository.findById(ownerId).orElseThrow(() -> new NotFoundException(USER_NOT_FOUND));
 
-        // Получаем все itemIds владельца
         List<Long> ownerItemIds = itemRepository.findByOwner(ownerId).stream()
                 .map(Item::getId)
                 .toList();
@@ -142,28 +148,28 @@ public class BookingServiceImpl implements BookingService {
             return List.of();
         }
 
-        return switch (state.toUpperCase()) {
-            case "ALL" -> bookingRepository.findByItemIdInOrderByStartDesc(ownerItemIds).stream()
+        return switch (state) {
+            case ALL -> bookingRepository.findByItemIdIn(ownerItemIds, NEWEST_FIRST).stream()
                     .map(bookingMapper::toBookingResponseDto)
                     .toList();
-            case "CURRENT" -> bookingRepository.findCurrentBookingsByItems(ownerItemIds, LocalDateTime.now()).stream()
+            case CURRENT -> bookingRepository.findCurrentBookingsByItems(
+                            ownerItemIds, LocalDateTime.now(), NEWEST_FIRST).stream()
                     .map(bookingMapper::toBookingResponseDto)
                     .toList();
-            case "PAST" ->
-                    bookingRepository.findByItemIdInAndEndBeforeOrderByStartDesc(ownerItemIds, LocalDateTime.now()).stream()
-                            .map(bookingMapper::toBookingResponseDto)
-                            .toList();
-            case "FUTURE" ->
-                    bookingRepository.findByItemIdInAndStartAfterOrderByStartDesc(ownerItemIds, LocalDateTime.now()).stream()
-                            .map(bookingMapper::toBookingResponseDto)
-                            .toList();
-            case "WAITING", "REJECTED" -> {
-                BookingStatus status = BookingStatus.valueOf(state.toUpperCase());
-                yield bookingRepository.findByItemIdInAndStatusOrderByStartDesc(ownerItemIds, status).stream()
+            case PAST -> bookingRepository.findByItemIdInAndEndBefore(
+                            ownerItemIds, LocalDateTime.now(), NEWEST_FIRST).stream()
+                    .map(bookingMapper::toBookingResponseDto)
+                    .toList();
+            case FUTURE -> bookingRepository.findByItemIdInAndStartAfter(
+                            ownerItemIds, LocalDateTime.now(), NEWEST_FIRST).stream()
+                    .map(bookingMapper::toBookingResponseDto)
+                    .toList();
+            case WAITING, REJECTED -> {
+                BookingStatus status = BookingStatus.valueOf(state.name());
+                yield bookingRepository.findByItemIdInAndStatus(ownerItemIds, status, NEWEST_FIRST).stream()
                         .map(bookingMapper::toBookingResponseDto)
                         .toList();
             }
-            default -> throw new IllegalArgumentException(UNKNOWN_STATE + state);
         };
     }
 }

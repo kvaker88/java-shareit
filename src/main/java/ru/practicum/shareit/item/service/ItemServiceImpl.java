@@ -2,6 +2,7 @@ package ru.practicum.shareit.item.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.shareit.booking.model.Booking;
@@ -40,6 +41,12 @@ public class ItemServiceImpl implements ItemService {
     private final CommentRepository commentRepository;
     private final ItemMapper itemMapper;
 
+    // Константы для сортировки
+    private static final Sort END_DESC = Sort.by(Sort.Direction.DESC, "end");
+    private static final Sort START_ASC = Sort.by(Sort.Direction.ASC, "start");
+    private static final Sort START_DESC = Sort.by(Sort.Direction.DESC, "start");
+
+    @Override
     @Transactional
     public ItemResponseDto createItem(Long userId, ItemRequestDto itemRequestDto) {
         User owner = userRepository.findById(userId)
@@ -52,6 +59,7 @@ public class ItemServiceImpl implements ItemService {
         return itemMapper.toItemResponseDto(savedItem);
     }
 
+    @Override
     public ItemResponseDto getItemById(Long itemId, Long userId) {
         Item item = itemRepository.findById(itemId)
                 .orElseThrow(() -> new NotFoundException(ITEM_NOT_FOUND + itemId));
@@ -81,11 +89,12 @@ public class ItemServiceImpl implements ItemService {
                 .map(Item::getId)
                 .toList();
 
-        Map<Long, List<Booking>> lastBookingsMap = bookingRepository.findLastBookingsForItems(itemIds, now)
+        // Добавляем Sort параметры
+        Map<Long, List<Booking>> lastBookingsMap = bookingRepository.findLastBookingsForItems(itemIds, now, END_DESC)
                 .stream()
                 .collect(Collectors.groupingBy(booking -> booking.getItem().getId()));
 
-        Map<Long, List<Booking>> nextBookingsMap = bookingRepository.findNextBookingsForItems(itemIds, now)
+        Map<Long, List<Booking>> nextBookingsMap = bookingRepository.findNextBookingsForItems(itemIds, now, START_ASC)
                 .stream()
                 .collect(Collectors.groupingBy(booking -> booking.getItem().getId()));
 
@@ -191,8 +200,9 @@ public class ItemServiceImpl implements ItemService {
     private void addBookingInfoToDto(ItemResponseDto dto, Long itemId) {
         LocalDateTime now = LocalDateTime.now();
 
-        List<Booking> lastBookings = bookingRepository.findLastBookingForItem(itemId, now);
-        List<Booking> nextBookings = bookingRepository.findNextBookingForItem(itemId, now);
+        // Добавляем Sort параметры
+        List<Booking> lastBookings = bookingRepository.findLastBookingForItem(itemId, now, END_DESC);
+        List<Booking> nextBookings = bookingRepository.findNextBookingForItem(itemId, now, START_ASC);
 
         if (!lastBookings.isEmpty()) {
             dto.setLastBooking(createBookingInfo(lastBookings.getFirst()));
