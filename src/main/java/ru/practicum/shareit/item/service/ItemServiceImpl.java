@@ -41,10 +41,8 @@ public class ItemServiceImpl implements ItemService {
     private final CommentRepository commentRepository;
     private final ItemMapper itemMapper;
 
-    // Константы для сортировки
     private static final Sort END_DESC = Sort.by(Sort.Direction.DESC, "end");
     private static final Sort START_ASC = Sort.by(Sort.Direction.ASC, "start");
-    private static final Sort START_DESC = Sort.by(Sort.Direction.DESC, "start");
 
     @Override
     @Transactional
@@ -89,7 +87,6 @@ public class ItemServiceImpl implements ItemService {
                 .map(Item::getId)
                 .toList();
 
-        // Добавляем Sort параметры
         Map<Long, List<Booking>> lastBookingsMap = bookingRepository.findLastBookingsForItems(itemIds, now, END_DESC)
                 .stream()
                 .collect(Collectors.groupingBy(booking -> booking.getItem().getId()));

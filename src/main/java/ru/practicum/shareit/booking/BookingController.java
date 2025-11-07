@@ -5,7 +5,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.shareit.booking.dto.BookingRequestDto;
 import ru.practicum.shareit.booking.dto.BookingResponseDto;
-import ru.practicum.shareit.booking.model.BookingState;
 import ru.practicum.shareit.booking.service.BookingService;
 
 import java.util.List;
@@ -48,8 +47,7 @@ public class BookingController {
             @RequestHeader(SHARER_USER_ID) Long userId,
             @RequestParam(defaultValue = "ALL") String state
     ) {
-        BookingState bookingState = parseBookingState(state);
-        return bookingService.getBookingByBookerId(userId, bookingState);
+        return bookingService.getBookingByBookerId(userId, state);
     }
 
     @GetMapping("/owner")
@@ -57,15 +55,6 @@ public class BookingController {
             @RequestHeader(SHARER_USER_ID) Long userId,
             @RequestParam(defaultValue = "ALL") String state
     ) {
-        BookingState bookingState = parseBookingState(state);
-        return bookingService.getBookingByOwnerId(userId, bookingState);
-    }
-
-    private BookingState parseBookingState(String state) {
-        try {
-            return BookingState.valueOf(state.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Неизвестное состояние: " + state);
-        }
+        return bookingService.getBookingByOwnerId(userId, state);
     }
 }

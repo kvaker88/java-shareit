@@ -37,8 +37,6 @@ public class BookingServiceImpl implements BookingService {
     private final BookingMapper bookingMapper;
 
     private static final Sort NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "start");
-    private static final Sort OLDEST_FIRST = Sort.by(Sort.Direction.ASC, "start");
-    private static final Sort END_DESC = Sort.by(Sort.Direction.DESC, "end");
 
     @Override
     @Transactional
@@ -106,10 +104,12 @@ public class BookingServiceImpl implements BookingService {
         return bookingMapper.toBookingResponseDto(booking);
     }
 
-    public List<BookingResponseDto> getBookingByBookerId(Long bookerId, BookingState state) {
+    public List<BookingResponseDto> getBookingByBookerId(Long bookerId, String state) {
         userRepository.findById(bookerId).orElseThrow(() -> new NotFoundException(USER_NOT_FOUND));
 
-        return switch (state) {
+        BookingState bookingState = parseBookingState(state);
+
+        return switch (bookingState) {
             case ALL -> bookingRepository.findByBookerId(bookerId, NEWEST_FIRST).stream()
                     .map(bookingMapper::toBookingResponseDto)
                     .toList();
@@ -128,7 +128,7 @@ public class BookingServiceImpl implements BookingService {
                     .map(bookingMapper::toBookingResponseDto)
                     .toList();
             case WAITING, REJECTED -> {
-                BookingStatus status = BookingStatus.valueOf(state.name());
+                BookingStatus status = BookingStatus.valueOf(bookingState.name());
                 yield bookingRepository.findByBookerIdAndStatus(bookerId, status, NEWEST_FIRST).stream()
                         .map(bookingMapper::toBookingResponseDto)
                         .toList();
@@ -137,8 +137,10 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
-    public List<BookingResponseDto> getBookingByOwnerId(Long ownerId, BookingState state) {
+    public List<BookingResponseDto> getBookingByOwnerId(Long ownerId, String state) {
         userRepository.findById(ownerId).orElseThrow(() -> new NotFoundException(USER_NOT_FOUND));
+
+        BookingState bookingState = parseBookingState(state);
 
         List<Long> ownerItemIds = itemRepository.findByOwner(ownerId).stream()
                 .map(Item::getId)
@@ -148,7 +150,7 @@ public class BookingServiceImpl implements BookingService {
             return List.of();
         }
 
-        return switch (state) {
+        return switch (bookingState) {
             case ALL -> bookingRepository.findByItemIdIn(ownerItemIds, NEWEST_FIRST).stream()
                     .map(bookingMapper::toBookingResponseDto)
                     .toList();
@@ -165,11 +167,19 @@ public class BookingServiceImpl implements BookingService {
                     .map(bookingMapper::toBookingResponseDto)
                     .toList();
             case WAITING, REJECTED -> {
-                BookingStatus status = BookingStatus.valueOf(state.name());
+                BookingStatus status = BookingStatus.valueOf(bookingState.name());
                 yield bookingRepository.findByItemIdInAndStatus(ownerItemIds, status, NEWEST_FIRST).stream()
                         .map(bookingMapper::toBookingResponseDto)
                         .toList();
             }
         };
+    }
+
+    private BookingState parseBookingState(String state) {
+        try {
+            return BookingState.valueOf(state.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Неизвестное состояние: " + state);
+        }
     }
 }
