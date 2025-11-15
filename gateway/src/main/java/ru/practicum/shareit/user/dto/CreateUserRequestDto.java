@@ -7,7 +7,7 @@ import lombok.Data;
 @Data
 public class CreateUserRequestDto {
 
-    @NotBlank(message ="Имя пользователя должно быть заполнено")
+    @NotBlank(message = "Имя пользователя должно быть заполнено")
     private String name;
 
     @NotBlank(message = "Email пользователя должен быть заполнен")

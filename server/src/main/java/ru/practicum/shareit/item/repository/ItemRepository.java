@@ -11,6 +11,7 @@ import java.util.List;
 public interface ItemRepository extends JpaRepository<Item, Long> {
 
     List<Item> findByOwner(Long ownerId);
+
     List<Item> findByRequestId(Long requestId);
 
     @Query("SELECT i FROM Item i " +

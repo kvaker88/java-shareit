@@ -42,13 +42,13 @@ class ItemRequestControllerTest {
     @MockBean
     private ItemRequestClient itemRequestClient;
 
-    private ItemRequestDto ItemRequestDto;
+    private ItemRequestDto itemRequestDto;
     private static final String SHARER_USER_ID = "X-Sharer-User-Id";
 
     @BeforeEach
     void setUp() {
-        ItemRequestDto = new ItemRequestDto();
-        ItemRequestDto.setDescription("Нужна дрель для ремонта");
+        itemRequestDto = new ItemRequestDto();
+        itemRequestDto.setDescription("Нужна дрель для ремонта");
     }
 
     @Test
@@ -60,7 +60,7 @@ class ItemRequestControllerTest {
         mockMvc.perform(post("/requests")
                         .header(SHARER_USER_ID, 1L)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(ItemRequestDto)))
+                        .content(objectMapper.writeValueAsString(itemRequestDto)))
                 .andExpect(status().isOk());
     }
 
@@ -82,7 +82,7 @@ class ItemRequestControllerTest {
     void create_whenMissingUserIdHeader_thenReturnBadRequest() throws Exception {
         mockMvc.perform(post("/requests")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(ItemRequestDto)))
+                        .content(objectMapper.writeValueAsString(itemRequestDto)))
                 .andExpect(status().isBadRequest());
     }
 
